@@ -896,12 +896,45 @@ def build_passage_map(export_path, ordered_notes, notebook_title=None):
     return passage_map, stats
 
 
-def interactive_highlight_file():
-    print("\nRecover highlighted passage text from a manual Logos export? (optional)")
-    print("  In Logos: open the SAME notebook you'll choose below, sort by Date Created,")
-    print("  and export the whole notebook as plain text (.txt).  Press Enter to skip.")
-    path = prompt("  Path to export .txt (or Enter to skip): ", "")
-    return os.path.expanduser(path) if path.strip() else None
+def resolve_input_path(raw):
+    """Clean a typed/dragged file path and return it if the file exists, else None.
+
+    Handles macOS drag-and-drop quirks: surrounding quotes (Terminal wraps dragged
+    paths in single quotes), backslash-escaped spaces/characters, and trailing
+    whitespace.  Falls back to the Desktop / current directory for a bare filename.
+    """
+    if not raw or not raw.strip():
+        return None
+    p = raw.strip()
+    if len(p) >= 2 and p[0] == p[-1] and p[0] in "'\"":   # strip wrapping quotes
+        p = p[1:-1]
+    p = re.sub(r"\\(.)", r"\1", p)                          # unescape "\ ", "\(", ...
+    p = os.path.expanduser(p.strip())
+    candidates = [p,
+                  os.path.join(os.path.expanduser("~/Desktop"), os.path.basename(p)),
+                  os.path.join(os.getcwd(), os.path.basename(p))]
+    for c in candidates:
+        if c and os.path.isfile(c):
+            return c
+    return None
+
+
+def interactive_highlight_file(notebook_title):
+    print("\nRecover the highlighted passage TEXT for {!r}? (optional, recommended)".format(
+        notebook_title))
+    print("  In Logos: open this notebook, select ALL its notes, sort by Date Created,")
+    print("  and export the whole notebook as plain text (.txt).")
+    print("  Then drag that .txt file here (or type its path) and press Enter,")
+    print("  or just press Enter now to skip and export without the highlighted text.")
+    while True:
+        raw = prompt("  Path to the .txt export (or Enter to skip): ", "")
+        if not raw.strip():
+            return None
+        resolved = resolve_input_path(raw)
+        if resolved:
+            return resolved
+        print("  !! Couldn't find a file at that path.  Drag the .txt in again,")
+        print("     or press Enter to skip the highlighted-text step.")
 
 
 # --------------------------------------------------------------------------
@@ -985,14 +1018,27 @@ def main():
         notebook_rows[0]["ext"] if notebook_rows else "")
 
     # ---- Resolve options (flags first, then prompt, then default) ----
-    highlight_file = args.highlight_file
-    if highlight_file:
-        highlight_file = os.path.expanduser(highlight_file)
+    # Notebook FIRST (one per run), so the highlight-file prompt can name it.
+    if args.notebook:
+        match = [r["ext"] for r in notebook_rows if (r["title"] or "") == args.notebook]
+        if not match:
+            sys.exit("No notebook titled {!r} was found.".format(args.notebook))
+        selected_ext = {match[0]}
     elif interactive:
-        highlight_file = interactive_highlight_file()
-    if highlight_file and not os.path.exists(highlight_file):
-        print("WARNING: highlight export file not found: {} (skipping enrichment)".format(
-            highlight_file))
+        selected_ext = {interactive_notebook(notebook_rows, default_ext)}
+    else:
+        selected_ext = {default_ext}
+    selected_title = data["notebooks"].get(next(iter(selected_ext))) or "(notebook)"
+
+    # Highlight export for THAT notebook (validated; re-prompts on a bad path).
+    if args.highlight_file:
+        highlight_file = resolve_input_path(args.highlight_file)
+        if not highlight_file:
+            print("WARNING: --highlight-file not found: {} (skipping enrichment)".format(
+                args.highlight_file))
+    elif interactive:
+        highlight_file = interactive_highlight_file(selected_title)
+    else:
         highlight_file = None
 
     if args.no_tags:
@@ -1016,18 +1062,6 @@ def main():
     dt_from = parse_logos_date(date_from) if date_from else None
     dt_to = parse_logos_date(date_to + " 23:59:59") if date_to else None
 
-    # One notebook per run (keeps the optional highlight-export match reliable).
-    if args.notebook:
-        match = [r["ext"] for r in notebook_rows if (r["title"] or "") == args.notebook]
-        if not match:
-            sys.exit("No notebook titled {!r} was found.".format(args.notebook))
-        selected_ext = {match[0]}
-    elif interactive:
-        selected_ext = {interactive_notebook(notebook_rows, default_ext)}
-    else:
-        selected_ext = {default_ext}
-
-    selected_title = data["notebooks"].get(next(iter(selected_ext))) or "(notebook)"
     print("\nExporting | notebook={!r} | title={} | categories={} | tags={} | {}..{}".format(
         selected_title, title_source, ",".join(categories),
         "on" if include_tags else "off", date_from or "-", date_to or "-"))

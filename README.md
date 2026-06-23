@@ -30,9 +30,9 @@ For those who just want to go (each step is explained in detail further down):
    cd ~/Desktop
    python3 logos_to_readwise.py        # on Windows: python logos_to_readwise.py
    ```
-5. **Answer the prompts.** When it asks for the highlight file, give it the `.txt`
-   from step 3 — and pick the **same notebook** you exported. *(This matching is the
-   one thing worth getting right — see [why](#-the-one-thing-to-get-right-keep-them-matched).)*
+5. **Answer the prompts.** First pick your notebook; then, when it asks for the
+   highlight file, **drag the `.txt` from step 3 into the window**. *(Use the export
+   of the same notebook — see [why](#-the-one-thing-to-get-right-keep-them-matched).)*
 6. **Import** the resulting `logos_readwise.csv` at
    [readwise.io/import_bulk](https://readwise.io/import_bulk).
 
@@ -127,18 +127,19 @@ suggested answer shown in brackets, or type your choice and press Enter.
 
 ## Step 4 — Answering the questions
 
-The tool asks just four short questions. When in doubt, press **Enter**.
-
-**HOWEVER** — if you attach a highlight export file, pick the **same notebook** you
-exported from Logos (and be sure you exported the *whole* notebook). That one match
-is all the tool needs to line everything up.
+The tool asks just four short questions, in this order. When in doubt, press **Enter**.
 
 | Question | What it means | Easy answer |
 |---|---|---|
-| **Highlight export file** | An optional file that lets the tool fill in the actual highlighted passages. Most people will want this. | Give it the `.txt` you exported ([see below](#optional-recovering-the-highlighted-text)), or press **Enter** to skip. |
-| **Include tags?** | Whether to add your Logos tags to each note. | Press **Enter** for yes. |
 | **Notebook** | Which Logos notebook to export — **one per run**. It lists them with numbers. | Type the number of the notebook you want. |
+| **Highlight export file** | The `.txt` export of that notebook, so the tool can fill in the actual highlighted passages. Most people will want this. | **Drag the `.txt` file into the window** and press Enter ([details](#optional-recovering-the-highlighted-text)), or press Enter to skip. |
+| **Include tags?** | Whether to add your Logos tags to each note. | Press **Enter** for yes. |
 | **Save location** | Where to save the finished file. | Press **Enter** to save to your Desktop. |
+
+> **Tip:** When asked for the highlight file, just **drag the `.txt` from your
+> Desktop into the Terminal window** — the tool handles the quotes and spaces macOS
+> adds. If it can't find the file, it tells you and lets you try again instead of
+> skipping. Make sure it's the export of the **same notebook** you just picked.
 
 When it finishes, you'll see a message like:
 
