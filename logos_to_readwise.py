@@ -749,14 +749,6 @@ def interactive_include_tags():
     return not choice.strip().lower().startswith("n")
 
 
-def interactive_title_source():
-    print("\nUse which value for the Readwise 'Title'?")
-    print("  1) Logos Notebook title  [default]")
-    print("  2) Logos resource title")
-    choice = prompt("  Choice [1]: ", "1")
-    return "resource" if choice == "2" else "notebook"
-
-
 def interactive_categories():
     print("\nWhich notes to include? (comma-separated, Enter = all)")
     print("  1) Highlights WITH a note")
@@ -770,23 +762,17 @@ def interactive_categories():
     return picked or list(ALL_CATEGORIES)
 
 
-def interactive_notebooks(notebook_rows, default_ext):
-    print("\nSelect notebooks (comma-separated numbers, 'all', or Enter for default):")
+def interactive_notebook(notebook_rows, default_ext):
+    """Pick exactly ONE notebook to export (one notebook per run)."""
+    print("\nSelect ONE notebook to export (type its number, or Enter for the default):")
     for i, nb in enumerate(notebook_rows, 1):
         marker = "  <- most recently modified (default)" if nb["ext"] == default_ext else ""
         title = nb["title"] or "(Untitled notebook)"
         print("  {}) {} [{} notes]{}".format(i, title, nb["count"], marker))
-    choice = prompt("  Choice [default]: ", "")
-    if choice.lower() == "all":
-        return {nb["ext"] for nb in notebook_rows}
-    if not choice:
-        return {default_ext}
-    selected = set()
-    for c in choice.split(","):
-        c = c.strip()
-        if c.isdigit() and 1 <= int(c) <= len(notebook_rows):
-            selected.add(notebook_rows[int(c) - 1]["ext"])
-    return selected or {default_ext}
+    choice = prompt("  Choice [default]: ", "").strip()
+    if choice.isdigit() and 1 <= int(choice) <= len(notebook_rows):
+        return notebook_rows[int(choice) - 1]["ext"]
+    return default_ext
 
 
 # --------------------------------------------------------------------------
@@ -920,8 +906,8 @@ def build_passage_map(export_path, ordered_notes, notebook_title=None):
 
 def interactive_highlight_file():
     print("\nRecover highlighted passage text from a manual Logos export? (optional)")
-    print("  In Logos: open this notebook, sort by Date Created, and export it as plain")
-    print("  text (.txt).  Choose the SAME notebook here.  Press Enter to skip.")
+    print("  In Logos: open the SAME notebook you'll choose below, sort by Date Created,")
+    print("  and export the whole notebook as plain text (.txt).  Press Enter to skip.")
     path = prompt("  Path to export .txt (or Enter to skip): ", "")
     return os.path.expanduser(path) if path.strip() else None
 
@@ -947,7 +933,8 @@ def main():
     ap.add_argument("--to", dest="date_to", help="Include notes on/before YYYY-MM-DD")
     ap.add_argument("--date-field", choices=["created", "modified"], default="created",
                     help="Which date drives filtering and the Date column")
-    ap.add_argument("--notebooks", help="Comma-separated notebook titles to include, or 'all'")
+    ap.add_argument("--notebook", help="Title of the single Logos notebook to export "
+                                       "(one notebook per run)")
     ap.add_argument("--include", help="Comma-separated of: both,highlight_only,note_only")
     ap.add_argument("--author", default="", help="Constant value for the Author column")
     ap.add_argument("--no-tags", action="store_true",
@@ -1020,9 +1007,7 @@ def main():
     else:
         include_tags = True
 
-    title_source = args.title_source
-    if title_source is None:
-        title_source = interactive_title_source() if interactive else "notebook"
+    title_source = args.title_source or "notebook"
 
     if args.include:
         categories = [c.strip() for c in args.include.split(",") if c.strip() in ALL_CATEGORIES]
@@ -1038,20 +1023,20 @@ def main():
     dt_from = parse_logos_date(date_from) if date_from else None
     dt_to = parse_logos_date(date_to + " 23:59:59") if date_to else None
 
-    if args.notebooks:
-        if args.notebooks.lower() == "all":
-            selected_ext = {r["ext"] for r in notebook_rows}
-        else:
-            want = {t.strip() for t in args.notebooks.split(",")}
-            selected_ext = {r["ext"] for r in notebook_rows
-                            if (r["title"] or "") in want}
+    # One notebook per run (keeps the optional highlight-export match reliable).
+    if args.notebook:
+        match = [r["ext"] for r in notebook_rows if (r["title"] or "") == args.notebook]
+        if not match:
+            sys.exit("No notebook titled {!r} was found.".format(args.notebook))
+        selected_ext = {match[0]}
     elif interactive:
-        selected_ext = interactive_notebooks(notebook_rows, default_ext)
+        selected_ext = {interactive_notebook(notebook_rows, default_ext)}
     else:
         selected_ext = {default_ext}
 
-    print("\nExporting | title={} | categories={} | notebooks={} | tags={} | {}..{}".format(
-        title_source, ",".join(categories), len(selected_ext),
+    selected_title = data["notebooks"].get(next(iter(selected_ext))) or "(notebook)"
+    print("\nExporting | notebook={!r} | title={} | categories={} | tags={} | {}..{}".format(
+        selected_title, title_source, ",".join(categories),
         "on" if include_tags else "off", date_from or "-", date_to or "-"))
 
     output_path = resolve_output_path(args.output, interactive)
@@ -1059,8 +1044,21 @@ def main():
     # ---- Optional: recover highlighted passage text from a manual Logos export ----
     passage_map = {}
     if highlight_file:
+        # Scope must mirror the manual export so records line up: same notebook(s),
+        # and the same Date-Created range if one was given (the export is sorted and
+        # filtered by Date Created).  Categories are NOT applied here - the export
+        # always contains every note kind.
+        def _in_created_range(nt):
+            d = parse_logos_date(nt.get("createdDate"))
+            if dt_from and (d is None or d < dt_from):
+                return False
+            if dt_to and (d is None or d > dt_to):
+                return False
+            return True
+
         scope_notes = [nt for nt in notes.values()
-                       if (nt.get("notebookExternalId") or "") in selected_ext]
+                       if (nt.get("notebookExternalId") or "") in selected_ext
+                       and _in_created_range(nt)]
         scope_notes.sort(key=lambda nt: (nt.get("createdDate") or "", nt.get("id")))
         nb_title = None
         if len(selected_ext) == 1:

@@ -16,6 +16,30 @@ If you make a mistake, you can delete in Readwise and try again.
 
 ---
 
+## Quick start
+
+For those who just want to go (each step is explained in detail further down):
+
+1. **Install Python 3** if you don't have it ([details](#step-1--make-sure-python-is-installed)).
+2. **Download** `logos_to_readwise.py` to your Desktop.
+3. **(Recommended) Export your highlights from Logos** so the tool can include the
+   actual highlighted text: in Logos, **open the notebook you want**, **sort by
+   Date Created**, and **export the whole notebook as plain text (.txt)** to your Desktop.
+4. **Open the Terminal** and run it:
+   ```
+   cd ~/Desktop
+   python3 logos_to_readwise.py        # on Windows: python logos_to_readwise.py
+   ```
+5. **Answer the prompts.** When it asks for the highlight file, give it the `.txt`
+   from step 3 — and pick the **same notebook** you exported. *(This matching is the
+   one thing worth getting right — see [why](#-the-one-thing-to-get-right-keep-them-matched).)*
+6. **Import** the resulting `logos_readwise.csv` at
+   [readwise.io/import_bulk](https://readwise.io/import_bulk).
+
+That's it. The rest of this page explains each step for anyone who'd like more detail.
+
+---
+
 ## What it does
 
 For every note and highlight in a Logos notebook, it creates one row containing:
@@ -105,16 +129,17 @@ suggested answer shown in brackets, or type your choice and press Enter.
 
 The tool asks these, in order. When in doubt, just press **Enter**.
 
-**HOWEVER** if you attach a highlight export file, your answers to the remaining questions must match the parameters of that file, specifically `Notebook` and ` Date range`.
+**HOWEVER** — if you attach a highlight export file, your answers to the remaining
+questions must match that file, specifically the **Notebook** and the **Date range**.
+If you don't use a highlight file, just press Enter through everything.
 
 | Question | What it means | Easy answer |
 |---|---|---|
-| **Highlight export file** | An optional file that lets the tool fill in the actual highlighted passages. | Press **Enter** to skip the first time. (See the section below to use it.) |
+| **Highlight export file** | An optional file that lets the tool fill in the actual highlighted passages. Most people will want this. | Give it the `.txt` you exported ([see below](#optional-recovering-the-highlighted-text)), or press **Enter** to skip. |
 | **Include tags?** | Whether to add your Logos tags to each note. | Press **Enter** for yes. |
-| **Title** | Whether to label rows by the **notebook** name or the **book** name. | Press **Enter** for notebook. |
 | **Which notes to include** | Highlights, notes, or both. | Press **Enter** for all. |
-| **Date range** | Only export notes between two dates. | Press **Enter** to include everything. |
-| **Notebook** | Which Logos notebook to export. It lists them with numbers. | Type the number of the notebook you want. |
+| **Date range** | Only export notes between two dates. (If you used a highlight file, leave this alone unless your export was date-limited the same way.) | Press **Enter** to include everything. |
+| **Notebook** | Which Logos notebook to export — **one per run**. It lists them with numbers. | Type the number of the notebook you want. |
 | **Save location** | Where to save the finished file. | Press **Enter** to save to your Desktop. |
 
 When it finishes, you'll see a message like:
@@ -144,20 +169,21 @@ see the tag line at all, answer **no** to the "Include tags?" question.
 
 ## Optional — Recovering the highlighted text
 
-Logos stores your **notes**, but it does **not** store the **text you
-highlighted** in a place this tool can read — it only keeps a pointer to the spot
-in the book. So by default, a highlight shows up as a *link* to the passage rather
-than the passage itself.
+**Most people will want this step.** Logos stores your **notes**, but it does
+**not** store the **text you highlighted** in a place this tool can read — it only
+keeps a pointer to the spot in the book. So by default, a highlight shows up as a
+*link* to the passage rather than the passage itself.
 
-You can recover the actual highlighted sentences with one extra step:
+You can recover the actual highlighted sentences with one extra export:
 
-1. In Logos, open the notebook you want to export.
-2. Sort the notes by **Date Created** (this is Logos's standard order).
-3. **Export the notebook as plain text** (a `.txt` file) and save it to your
-   Desktop. *(In Logos: the notebook's menu → Print/Export → choose a plain-text
-   or document format.)*
-4. Run the tool again. When it asks for the **Highlight export file**, type the
-   path to that file, for example:
+1. In Logos, **open the notebook** you're going to export (the tool works on one
+   notebook at a time — export the **whole notebook**, not a single book).
+2. **Sort by Date Created** (this is Logos's standard order — leave it as is).
+3. **Export the whole notebook as plain text** (a `.txt` file) and save it to your
+   Desktop. *(In Logos: the notes panel menu → Print/Export → choose a plain-text or
+   document format.)*
+4. Run the tool. When it asks for the **Highlight export file**, type the path to
+   that file, for example:
    ```
    ~/Desktop/My Notebook.txt
    ```
@@ -167,16 +193,26 @@ You can recover the actual highlighted sentences with one extra step:
 The tool then matches each note to its passage and places the highlighted text at
 the top of the row.
 
+### ⭐ The one thing to get right: keep them matched
+
+This is the only part that needs a little care — but it's simple once you see it:
+
+> **The Logos export and the tool must point at the same notes.**
+> Export the **whole notebook** from Logos, choose that **same notebook** in the
+> tool, and leave the export **sorted by Date Created** (and keep the same Date
+> range if you set one). That's what lets the tool line each note up with its
+> highlighted passage.
+
+If they line up, the tool tells you so. If the counts don't match (say, you
+exported one notebook but ran the tool on a different one), it prints a friendly
+**warning** so you'll know to re-export — it won't fail silently.
+
 ### How reliable is this?
 - For highlights **that have a note**, the match is based on your note's exact
   words — **very accurate**.
 - For highlights **with no note**, the tool lines them up by their order in the
   export. This is usually correct, but because it relies on order, it's worth
-  **glancing over a few** of those after importing. The tool prints a summary and
-  a warning if the counts don't line up perfectly.
-
-> Make sure you export the **same notebook** you're exporting with the tool, and
-> leave it sorted by Date Created, so the two line up.
+  **glancing over a few** of those after importing.
 
 ---
 
@@ -192,6 +228,12 @@ is installed in a non-standard place. You can point the tool at the file directl
 ```
 python3 logos_to_readwise.py --db "/full/path/to/notestool.db"
 ```
+
+**The highlighted text didn't come through, or looks shifted**
+This almost always means the Logos export and the tool weren't pointed at the same
+notes. Export the **whole notebook** (not a single book), keep it **sorted by Date
+Created**, and pick that same notebook when the tool asks. See
+[The one thing to get right](#-the-one-thing-to-get-right-keep-them-matched).
 
 **The file name has spaces and the Terminal complains**
 Wrap names with spaces in quotes, e.g. `"My Notebook.txt"`. Or drag the file into
@@ -212,7 +254,8 @@ and press Enter at each prompt to include everything.
   and Greek text.
 - For book highlights it builds a precise `ref.ly` link to the exact position.
 - The optional highlighted-text recovery matches your manual export back to each
-  note to fill in the passages.
+  note: notes with text are matched by their exact words, and the note-less
+  highlights in between are filled in by order.
 
 Everything uses only what comes built into Python — no extra downloads.
 
