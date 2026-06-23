@@ -437,18 +437,13 @@ def readwise_date(dt):
 # --------------------------------------------------------------------------
 # Database access
 # --------------------------------------------------------------------------
-def open_ro(path):
-    uri = "file:{}?mode=ro&immutable=1".format(os.path.abspath(path).replace("?", "%3f"))
-    conn = sqlite3.connect(uri, uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def open_ro_wal(path):
-    """Read-only open that still honours the -wal file.
+    """Open a Logos database read-only while still honouring its -wal file.
 
-    Logos' live databases (e.g. ResourceManager.db) keep recent writes in a
-    WAL; immutable mode would hide them, so use plain mode=ro here.
+    Logos databases are LIVE: recent notes/anchors can sit in the write-ahead log
+    (-wal) before being checkpointed into the main file.  SQLite's immutable mode
+    would ignore the WAL and read a stale snapshot -- so a run during active syncing
+    could silently miss data -- hence plain mode=ro here.
     """
     uri = "file:{}?mode=ro".format(os.path.abspath(path).replace("?", "%3f"))
     conn = sqlite3.connect(uri, uri=True)
@@ -858,16 +853,27 @@ def build_passage_map(export_path, ordered_notes, notebook_title=None):
             anchors.append((j, hits[0]))
 
     # 2. Assign a record to each note: anchors directly, gaps by interpolation.
-    #    The export runs newest->oldest, so record index DECREASES as note index
-    #    increases.  Within a gap whose note-count == record-count, map in order.
+    #    The export may be sorted oldest-first OR newest-first (Logos allows either),
+    #    so detect the direction from the anchors -- does the record index rise or fall
+    #    as the note index rises? -- and fill each gap's note-less highlights to match.
     assigned = {j: i for j, i in anchors}
-    bounds = [(-1, n_rec)] + anchors + [(len(ordered_notes), -1)]
+    # Majority vote (robust to the odd misplaced anchor): do record indices mostly
+    # rise or fall as the note index rises?  Rising => oldest-first export.
+    _inc = sum(1 for k in range(1, len(anchors)) if anchors[k][1] > anchors[k - 1][1])
+    _dec = sum(1 for k in range(1, len(anchors)) if anchors[k][1] < anchors[k - 1][1])
+    rising = _inc > _dec
+    if rising:
+        bounds = [(-1, -1)] + anchors + [(len(ordered_notes), n_rec)]
+    else:
+        bounds = [(-1, n_rec)] + anchors + [(len(ordered_notes), -1)]
     for (ja, ia), (jb, ib) in zip(bounds, bounds[1:]):
         gap_notes = list(range(ja + 1, jb))
-        gap_recs = list(range(ib + 1, ia))   # ascending record indices in the gap
+        lo, hi = (ia, ib) if ia <= ib else (ib, ia)
+        gap_recs = list(range(lo + 1, hi))            # records strictly between anchors
         if gap_notes and len(gap_notes) == len(gap_recs):
+            ordered_recs = gap_recs if rising else list(reversed(gap_recs))
             for k, jn in enumerate(gap_notes):
-                assigned[jn] = gap_recs[len(gap_recs) - 1 - k]  # note asc <-> rec desc
+                assigned[jn] = ordered_recs[k]
 
     # 3. Extract each assigned record's passage, keyed by NoteId.
     passage_map = {}
@@ -946,8 +952,11 @@ def main():
     print("Resource DB:  {}".format(
         resourcemanager_path or "(not found - ref.ly abbreviations unavailable)"))
 
-    conn = open_ro(db_path)
-    catalog_conn = open_ro(catalog_path) if catalog_path else None
+    # Honour the -wal file: Logos is a LIVE database and recent notes/anchors can sit
+    # in the WAL.  Immutable mode would ignore the WAL and read a stale snapshot, which
+    # makes a run during active syncing silently miss data.
+    conn = open_ro_wal(db_path)
+    catalog_conn = open_ro_wal(catalog_path) if catalog_path else None
     resourcemanager_conn = open_ro_wal(resourcemanager_path) if resourcemanager_path else None
     resource_abbrevs = load_resource_abbreviations(resourcemanager_conn)
     data = load_notes(conn, catalog_conn, resource_abbrevs)
