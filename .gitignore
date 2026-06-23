@@ -1,0 +1,19 @@
+# --- Personal data: NEVER publish Logos notes or exported highlights ---
+*.csv
+*.txt
+*.docx
+*.rtf
+*.html
+*.pdf
+~$*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- macOS / editors ---
+.DS_Store
+.vscode/
+.idea/
