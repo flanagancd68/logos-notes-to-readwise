@@ -269,7 +269,7 @@ Everything uses only what comes built into Python — no extra downloads.
 ---
 
 ## Credits
-
+[Acts 17.11](https://ref.ly/Acts.17.11) and [James 1.22](https://ref.ly/Jas.1.22)
 Inspired by the excellent
 [agape-apps/Logos-Notes-Exporter](https://github.com/agape-apps/Logos-Notes-Exporter).
-Built for the Logos + Readwise community. Use it freely.
+Built for the Logos + Readwise community. Use it freely.  
