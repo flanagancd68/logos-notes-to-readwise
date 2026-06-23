@@ -734,32 +734,10 @@ def prompt(msg, default=""):
     return val or default
 
 
-def interactive_date_range():
-    print("\nDate range (press Enter to skip a bound). Format: YYYY-MM-DD")
-    start = prompt("  From date: ")
-    end = prompt("  To date:   ")
-    return start or None, end or None
-
-
 def interactive_include_tags():
     print("\nInclude Logos tags on the first line of each note? (e.g. '.SurveyofOT .book_notes')")
-    print("  Note: Readwise may not auto-recognize them on CSV import; you may need to")
-    print("  open a note and re-save to make it parse the tag line.")
     choice = prompt("  Include tags? [Y/n]: ", "y")
     return not choice.strip().lower().startswith("n")
-
-
-def interactive_categories():
-    print("\nWhich notes to include? (comma-separated, Enter = all)")
-    print("  1) Highlights WITH a note")
-    print("  2) Highlights WITHOUT a note")
-    print("  3) Text notes (no highlight)")
-    choice = prompt("  Choice [all]: ", "")
-    if not choice:
-        return list(ALL_CATEGORIES)
-    mapping = {"1": CAT_BOTH, "2": CAT_HL_ONLY, "3": CAT_NOTE_ONLY}
-    picked = [mapping[c.strip()] for c in choice.split(",") if c.strip() in mapping]
-    return picked or list(ALL_CATEGORIES)
 
 
 def interactive_notebook(notebook_rows, default_ext):
@@ -1009,17 +987,15 @@ def main():
 
     title_source = args.title_source or "notebook"
 
+    # Default to every note kind; --include is a command-line-only override.
     if args.include:
         categories = [c.strip() for c in args.include.split(",") if c.strip() in ALL_CATEGORIES]
         categories = categories or list(ALL_CATEGORIES)
-    elif interactive:
-        categories = interactive_categories()
     else:
         categories = list(ALL_CATEGORIES)
 
+    # No date filter by default; --from/--to are command-line-only overrides.
     date_from, date_to = args.date_from, args.date_to
-    if date_from is None and date_to is None and interactive:
-        date_from, date_to = interactive_date_range()
     dt_from = parse_logos_date(date_from) if date_from else None
     dt_to = parse_logos_date(date_to + " 23:59:59") if date_to else None
 

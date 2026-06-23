@@ -23,8 +23,8 @@ For those who just want to go (each step is explained in detail further down):
 1. **Install Python 3** if you don't have it ([details](#step-1--make-sure-python-is-installed)).
 2. **Download** `logos_to_readwise.py` to your Desktop.
 3. **(Recommended) Export your highlights from Logos** so the tool can include the
-   actual highlighted text: in Logos, **open the notebook you want**, **sort by
-   Date Created**, and **export the whole notebook as plain text (.txt)** to your Desktop.
+   actual highlighted text: in Logos, **select every note in the notebook**, **set
+   the sort to Date Created**, and **export to plain text (.txt)** on your Desktop.
 4. **Open the Terminal** and run it:
    ```
    cd ~/Desktop
@@ -127,18 +127,16 @@ suggested answer shown in brackets, or type your choice and press Enter.
 
 ## Step 4 — Answering the questions
 
-The tool asks these, in order. When in doubt, just press **Enter**.
+The tool asks just four short questions. When in doubt, press **Enter**.
 
-**HOWEVER** — if you attach a highlight export file, your answers to the remaining
-questions must match that file, specifically the **Notebook** and the **Date range**.
-If you don't use a highlight file, just press Enter through everything.
+**HOWEVER** — if you attach a highlight export file, pick the **same notebook** you
+exported from Logos (and be sure you exported the *whole* notebook). That one match
+is all the tool needs to line everything up.
 
 | Question | What it means | Easy answer |
 |---|---|---|
 | **Highlight export file** | An optional file that lets the tool fill in the actual highlighted passages. Most people will want this. | Give it the `.txt` you exported ([see below](#optional-recovering-the-highlighted-text)), or press **Enter** to skip. |
 | **Include tags?** | Whether to add your Logos tags to each note. | Press **Enter** for yes. |
-| **Which notes to include** | Highlights, notes, or both. | Press **Enter** for all. |
-| **Date range** | Only export notes between two dates. (If you used a highlight file, leave this alone unless your export was date-limited the same way.) | Press **Enter** to include everything. |
 | **Notebook** | Which Logos notebook to export — **one per run**. It lists them with numbers. | Type the number of the notebook you want. |
 | **Save location** | Where to save the finished file. | Press **Enter** to save to your Desktop. |
 
@@ -159,11 +157,10 @@ That `logos_readwise.csv` file on your Desktop is your export. 🎉
 3. Readwise will add your notes and highlights to your library.
 
 ### A note about tags
-Readwise sometimes does **not** turn the `.tags` into real tags during a CSV
-import. If that happens, open one of the imported highlights in Readwise, make a
-tiny edit to its note, and save — Readwise will then recognize the whole tag line.
-This is a Readwise quirk, not something the tool can change. If you'd rather not
-see the tag line at all, answer **no** to the "Include tags?" question.
+Your Logos tags are placed on the first line of each note as `.tags` — the format
+Readwise recognizes. After importing, Readwise may take a moment to process them
+into real tags, so don't worry if they don't appear instantly. If you'd rather not
+include them at all, answer **no** to the "Include tags?" question.
 
 ---
 
@@ -198,10 +195,9 @@ the top of the row.
 This is the only part that needs a little care — but it's simple once you see it:
 
 > **The Logos export and the tool must point at the same notes.**
-> Export the **whole notebook** from Logos, choose that **same notebook** in the
-> tool, and leave the export **sorted by Date Created** (and keep the same Date
-> range if you set one). That's what lets the tool line each note up with its
-> highlighted passage.
+> Export the **whole notebook** from Logos (select every note), choose that **same
+> notebook** in the tool, and leave the export **sorted by Date Created**. That's
+> what lets the tool line each note up with its highlighted passage.
 
 If they line up, the tool tells you so. If the counts don't match (say, you
 exported one notebook but ran the tool on a different one), it prints a friendly
@@ -240,8 +236,8 @@ Wrap names with spaces in quotes, e.g. `"My Notebook.txt"`. Or drag the file int
 the Terminal window to insert its path automatically.
 
 **Nothing was exported**
-You may have picked a notebook or date range with no matching notes. Run it again
-and press Enter at each prompt to include everything.
+You may have picked an empty notebook. Run it again and choose a notebook that has
+notes in it.
 
 ---
 
