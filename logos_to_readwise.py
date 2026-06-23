@@ -875,6 +875,7 @@ def build_passage_map(export_path, ordered_notes, notebook_title=None):
     stats = {
         "records": n_rec,
         "notes": len(ordered_notes),
+        "notes_with_text": sum(1 for p in note_prose.values() if p),
         "anchors": len(anchors),
         "assigned": len(assigned),
         "passages": len(passage_map),
@@ -1040,13 +1041,34 @@ def main():
         if len(selected_ext) == 1:
             nb_title = data["notebooks"].get(next(iter(selected_ext)))
         passage_map, pstats = build_passage_map(highlight_file, scope_notes, nb_title)
+        records_n = pstats["records"]
+        notes_n = pstats["notes"]
+        with_text = pstats["notes_with_text"]
+        anchors_n = pstats["anchors"]
         print("\nHighlight enrichment | export records={} | notes in scope={} | "
               "anchors={} | passages recovered={}".format(
-                  pstats["records"], pstats["notes"], pstats["anchors"], pstats["passages"]))
-        if pstats["records"] != pstats["notes"]:
-            print("  WARNING: record count ({}) != notes in scope ({}). The anchored match "
-                  "compensates, but spot-check a few rows.".format(
-                      pstats["records"], pstats["notes"]))
+                  records_n, notes_n, anchors_n, pstats["passages"]))
+
+        # Judge alignment by MATCH QUALITY, not a raw count difference (small gaps
+        # are normal).  Flag only when the two clearly aren't the same notes: a big
+        # count gap, or few of the text notes actually matched.
+        gap_frac = abs(records_n - notes_n) / max(records_n, notes_n, 1)
+        match_rate = (anchors_n / with_text) if with_text else 1.0
+        looks_wrong = gap_frac > 0.20 or (with_text >= 5 and match_rate < 0.5)
+
+        if looks_wrong:
+            print("  " + "!" * 68)
+            print("  WARNING: the export file and this notebook do NOT look like the")
+            print("  same set of notes.  Only {:.0f}% of your text notes matched, and the".format(
+                match_rate * 100))
+            print("  counts differ a lot ({} records vs {} notes).".format(records_n, notes_n))
+            print("  --> Did you export the WHOLE notebook?  In Logos, select EVERY note in")
+            print("      this notebook, sort by Date Created, export to plain text, re-run.")
+            print("  Recovered highlights are unreliable until these line up.")
+            print("  " + "!" * 68)
+        else:
+            print("  OK: the export lines up with this notebook "
+                  "({:.0f}% of text notes matched).".format(match_rate * 100))
 
     # ---- Build rows ----
     rows = []

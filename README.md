@@ -199,9 +199,11 @@ This is the only part that needs a little care — but it's simple once you see 
 > notebook** in the tool, and leave the export **sorted by Date Created**. That's
 > what lets the tool line each note up with its highlighted passage.
 
-If they line up, the tool tells you so. If the counts don't match (say, you
-exported one notebook but ran the tool on a different one), it prints a friendly
-**warning** so you'll know to re-export — it won't fail silently.
+After it runs, the tool tells you whether the export **lines up** with the notebook
+(e.g. *"OK: the export lines up with this notebook (98% of text notes matched)"*).
+If it doesn't look like the same set of notes — say you exported a single book
+instead of the whole notebook — it prints a clear **warning** so you'll know to
+re-export. It won't fail silently.
 
 ### How reliable is this?
 - For highlights **that have a note**, the match is based on your note's exact
