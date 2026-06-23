@@ -742,14 +742,21 @@ def interactive_include_tags():
 
 def interactive_notebook(notebook_rows, default_ext):
     """Pick exactly ONE notebook to export (one notebook per run)."""
+    # Only offer notebooks that have a real title.  Orphaned/untitled notebooks
+    # (left over from deleted notebooks, etc.) are noise the user can't meaningfully
+    # pick, so they're hidden from the list.
+    named = [nb for nb in notebook_rows if nb["title"]]
+    if not named:
+        named = notebook_rows
+    if not any(nb["ext"] == default_ext for nb in named):
+        default_ext = named[0]["ext"]
     print("\nSelect ONE notebook to export (type its number, or Enter for the default):")
-    for i, nb in enumerate(notebook_rows, 1):
+    for i, nb in enumerate(named, 1):
         marker = "  <- most recently modified (default)" if nb["ext"] == default_ext else ""
-        title = nb["title"] or "(Untitled notebook)"
-        print("  {}) {} [{} notes]{}".format(i, title, nb["count"], marker))
+        print("  {}) {} [{} notes]{}".format(i, nb["title"], nb["count"], marker))
     choice = prompt("  Choice [default]: ", "").strip()
-    if choice.isdigit() and 1 <= int(choice) <= len(notebook_rows):
-        return notebook_rows[int(choice) - 1]["ext"]
+    if choice.isdigit() and 1 <= int(choice) <= len(named):
+        return named[int(choice) - 1]["ext"]
     return default_ext
 
 
@@ -1105,40 +1112,36 @@ def main():
         # Highlight = anchor block for actual highlights / Bible refs.
         # For kind=0 text notes whose only anchor is an offset (book position link),
         # the prose is the real content — use its first line as the highlight instead.
-        anchor_block = assemble_anchor_block(note["id"], data)
+        anchor_block = assemble_anchor_block(note["id"], data)  # Bible-ref links OR ref.ly book link
         has_bible_refs = bool(data["bible_anchors"].get(note["id"]))
         is_highlight = note.get("kind") == 1
-
-        if is_highlight or has_bible_refs:
-            highlight = anchor_block
-            if not highlight.strip():
-                if prose.strip():
-                    highlight = prose.strip().splitlines()[0][:300]
-                else:
-                    highlight = "Logos note - {}".format(
-                        readwise_date(dt) or note.get("externalId") or note["id"])
-        else:
-            # Text note attached to a book position: prose is the main content
-            if prose.strip():
-                highlight = prose.strip().splitlines()[0][:300]
-            elif anchor_block.strip():
-                highlight = anchor_block
-            else:
-                highlight = "Logos note - {}".format(
-                    readwise_date(dt) or note.get("externalId") or note["id"])
-
-        # If a highlighted passage was recovered from the manual export, put it at
-        # the top of the Highlight for book (offset-anchored) notes, with the book
-        # link beneath it.  The note prose stays in the Note column.
-        passage = passage_map.get(note["id"], "")
         is_book = bool(data["offset_anchors"].get(note["id"])) and not has_bible_refs
-        if passage and is_book:
-            link = anchor_block.strip()
-            highlight = passage + ("\n" + link if link else "")
+        passage = passage_map.get(note["id"], "")
+        link = anchor_block.strip()
+        first_line = prose.strip().splitlines()[0][:300] if prose.strip() else ""
+
+        if is_book:
+            # Book highlight/annotation: recovered passage (if any) on top of the ref.ly
+            # link back to Logos.  The note's own words live in the Note column, so the
+            # link is ALWAYS shown here -- even when no passage was recovered.
+            if passage and link:
+                highlight = passage + "\n" + link
+            elif passage:
+                highlight = passage
+            elif link:
+                highlight = link
+            else:
+                highlight = first_line
+        elif has_bible_refs:
+            # Bible-anchored: the verse reference links are the highlight.
+            highlight = link or first_line
+        else:
+            # Plain text note with no book/Bible anchor: the prose is the content.
+            highlight = first_line or link
 
         if not highlight.strip():
-            skipped_empty += 1
-            continue
+            highlight = "Logos note - {}".format(
+                readwise_date(dt) or note.get("externalId") or note["id"])
 
         # Note = tag line + prose.  For kind=1 highlights that have a paired kind=0
         # annotation, append that annotation's text and merge in its tags.
