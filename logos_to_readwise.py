@@ -156,11 +156,18 @@ def encode_resource_id(resource_id):
     return resource_id.replace(":", "%3A")
 
 
-def bible_anchor_link(resource_id, reference):
+def bible_anchor_link(resource_id, reference, display=None):
     enc = encode_resource_id(resource_id)
-    if not enc or not reference:
-        return None
-    return "{}/{}/references/{}".format(LOGOS_APP_BASE, enc, reference)
+    if enc and reference:
+        return "{}/{}/references/{}".format(LOGOS_APP_BASE, enc, reference)
+    # No anchoring resource (a plain scripture reference): link via ref.ly's Bible
+    # resolver, which opens the verse in the reader's preferred Bible.  e.g.
+    # "Romans 1:7" -> https://ref.ly/Romans1.7
+    if display:
+        slug = display.replace(" ", "").replace(":", ".")
+        if slug:
+            return "https://ref.ly/{}".format(slug)
+    return None
 
 
 REFLY_BASE = "https://ref.ly/logosres"
@@ -568,7 +575,7 @@ def load_notes(conn, catalog_conn, resource_abbrevs=None):
         note = notes.get(r["noteId"])
         res_id = resource_ids.get(note["anchorResourceIdId"]) if note else None
         display = format_reference(r["reference"], r["bibleBook"])
-        link = bible_anchor_link(res_id, r["reference"])
+        link = bible_anchor_link(res_id, r["reference"], display)
         bible_anchors.setdefault(r["noteId"], []).append(
             Anchor(r["anchorIndex"], display, link))
 
@@ -828,7 +835,27 @@ def _passage_from_record(record, note_prose):
     return ""  # the whole record is the note -> no passage
 
 
-def build_passage_map(export_path, ordered_notes, notebook_title=None):
+def _trim_reference_labels(passage, displays):
+    """Drop trailing Bible-reference labels from a recovered passage.
+
+    Multi-anchor records list the note's scripture references (e.g. "1 Corinthians
+    12:11") as plain text right after the highlighted sentence.  We render those as
+    links separately, so cut the passage at the first line that matches one of the
+    note's reference labels.
+    """
+    if not displays:
+        return passage
+    wanted = {_norm_for_match(d) for d in displays if d}
+    wanted.discard("")
+    out = []
+    for line in passage.split("\n"):
+        if line.strip() and _norm_for_match(line) in wanted:
+            break
+        out.append(line)
+    return "\n".join(out).strip()
+
+
+def build_passage_map(export_path, ordered_notes, notebook_title=None, bible_displays=None):
     """Map NoteId -> recovered highlighted passage text from a Logos export.
 
     `ordered_notes` is every note in the export's scope, sorted by creation
@@ -876,12 +903,14 @@ def build_passage_map(export_path, ordered_notes, notebook_title=None):
                 assigned[jn] = ordered_recs[k]
 
     # 3. Extract each assigned record's passage, keyed by NoteId.
+    bible_displays = bible_displays or {}
     passage_map = {}
     for j, note in enumerate(ordered_notes):
         i = assigned.get(j)
         if i is None:
             continue
         passage = _passage_from_record(records[i], note_prose.get(j, ""))
+        passage = _trim_reference_labels(passage, bible_displays.get(note["id"], []))
         if passage and passage.strip():
             passage_map[note["id"]] = passage.strip()
 
@@ -1090,7 +1119,12 @@ def main():
         nb_title = None
         if len(selected_ext) == 1:
             nb_title = data["notebooks"].get(next(iter(selected_ext)))
-        passage_map, pstats = build_passage_map(highlight_file, scope_notes, nb_title)
+        # Reference labels per note, so the recovered passage can be trimmed of the
+        # scripture references we render as links separately.
+        bible_displays = {nid: [a.display for a in anchs]
+                          for nid, anchs in data["bible_anchors"].items()}
+        passage_map, pstats = build_passage_map(highlight_file, scope_notes, nb_title,
+                                                bible_displays)
         records_n = pstats["records"]
         notes_n = pstats["notes"]
         with_text = pstats["notes_with_text"]
@@ -1152,35 +1186,28 @@ def main():
         else:
             title = data["notebooks"].get(ext) or ("(No notebook)" if ext == "" else "(Untitled)")
 
-        # Highlight = anchor block for actual highlights / Bible refs.
-        # For kind=0 text notes whose only anchor is an offset (book position link),
-        # the prose is the real content — use its first line as the highlight instead.
-        anchor_block = assemble_anchor_block(note["id"], data)  # Bible-ref links OR ref.ly book link
-        has_bible_refs = bool(data["bible_anchors"].get(note["id"]))
+        # Highlight column.  A note can be anchored to a book position (offset ->
+        # ref.ly link, with a recoverable passage) AND/OR to Bible verses, AND/OR be
+        # a plain typed note.  assemble_anchor_block already renders ALL anchor links
+        # (book + Bible) together.
+        anchor_block = assemble_anchor_block(note["id"], data)
         is_highlight = note.get("kind") == 1
-        is_book = bool(data["offset_anchors"].get(note["id"])) and not has_bible_refs
+        has_offset = bool(data["offset_anchors"].get(note["id"]))
         passage = passage_map.get(note["id"], "")
         link = anchor_block.strip()
         first_line = prose.strip().splitlines()[0][:300] if prose.strip() else ""
 
-        if is_book:
-            # Book highlight/annotation: recovered passage (if any) on top of the ref.ly
-            # link back to Logos.  The note's own words live in the Note column, so the
-            # link is ALWAYS shown here -- even when no passage was recovered.
-            if passage and link:
-                highlight = passage + "\n" + link
-            elif passage:
-                highlight = passage
-            elif link:
-                highlight = link
-            else:
-                highlight = first_line
-        elif has_bible_refs:
-            # Bible-anchored: the verse reference links are the highlight.
-            highlight = link or first_line
+        if has_offset and passage:
+            # Book highlight (possibly with Bible refs too): recovered passage on top
+            # of all the links.  The note's own words stay in the Note column.
+            highlight = passage + ("\n" + link if link else "")
+        elif link:
+            # Anchored but no recovered book passage (Bible-only, or a book highlight
+            # whose passage wasn't recovered): show the links.
+            highlight = link
         else:
-            # Plain text note with no book/Bible anchor: the prose is the content.
-            highlight = first_line or link
+            # Plain typed note with no anchors: its first line is the content.
+            highlight = first_line
 
         if not highlight.strip():
             highlight = "Logos note - {}".format(
