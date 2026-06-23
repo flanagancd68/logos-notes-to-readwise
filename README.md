@@ -10,6 +10,10 @@ hand-copying a single one.
 You do **not** need to be a programmer to use this. The steps below walk through
 everything, including how to open the Terminal for the first time.
 
+**Please read this file carefully before attempting to import into Readwise**
+
+If you make a mistake, you can delete in Readwise and try again.
+
 ---
 
 ## What it does
@@ -100,6 +104,8 @@ suggested answer shown in brackets, or type your choice and press Enter.
 ## Step 4 — Answering the questions
 
 The tool asks these, in order. When in doubt, just press **Enter**.
+
+**HOWEVER** if you attach a highlight export file, your answers to the remaining questions must match the parameters of that file, specifically `Notebook` and ` Date range`.
 
 | Question | What it means | Easy answer |
 |---|---|---|
